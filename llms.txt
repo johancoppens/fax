@@ -1,0 +1,24 @@
+# Faxlijn 9600: How does a fax work? / Hoe werkt een fax?
+
+> A free, bilingual (Dutch and English) interactive classroom simulation of a Group 3 fax machine, by Johan Coppens, licensed CC BY 4.0. It synthesises a complete fax call in the browser following the ITU standards T.30, V.21, V.29 and T.4, plays it as sound, and decodes it back from the audio step by step: sound, bits, meaning, dots on paper. Students can fax their own text, image, screenshot or webcam photo.
+
+Audience: secondary school (ages 12 to 18), subjects computer science / ICT, STEM, physics (sound and waves), electronics, history of technology. A lesson takes 15 to 50 minutes. One HTML file, no install, no account; works on laptops, Chromebooks and interactive whiteboards.
+
+## What students learn
+
+- Analog versus digital, and where A/D and D/A conversion happen in a fax: the scanner (light to black/white dots), the modem (bits to sound and back), the printer.
+- Bits and bit rate: 300 bit/s for the handshake (V.21 FSK: 1650 Hz = 1, 1850 Hz = 0), 9600 bit/s for the page (V.29: 2400 symbols per second, 16 points, 4 bits each).
+- Compression: each scan line of 1728 dots is sent as run lengths ("white 312, black 4") with Modified Huffman codes (T.4); a typical page becomes 5 to 20 times smaller, a photo much less.
+- Protocols and error checking: the machines exchange HDLC frames with a CRC (CSI, DIS, TSI, DCS, CFR, EOP, MCF, DCN) and test the line with 1.5 s of zeros (TCF).
+- Why a fax sounds like noise: scrambled data at 2400 symbols per second.
+- History: the fax was invented in 1843 by Alexander Bain, 33 years before the telephone, and was in commercial use between Paris and Lyon from 1865 (Caselli's pantelegraph).
+
+## Links
+
+- [The simulation](https://johancoppens.github.io/fax/): add ?lang=en or ?lang=nl to force a language; otherwise it follows the browser.
+- [Source code and README](https://github.com/johancoppens/fax)
+- [Licence: CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+
+## Honest limits
+
+The receiver already knows the symbol clock and carrier phase (a real modem recovers them from the training sequence), the pause after CNG is shortened, there is no NSF frame, and the capability bits in DIS and DCS are simplified.

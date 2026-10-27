@@ -4,7 +4,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'faxlijn.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const core = html.match(/<script id="core">([\s\S]*?)<\/script>/)[1];
 const api = new Function(core + '; return { WIDTH, SR, FCF, buildCall, Monitor };')();
 const { WIDTH, SR, FCF, buildCall, Monitor } = api;
