@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Faxlijn 9600</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,7 +28,9 @@
   --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
+body { margin: 0; }
 body {
   background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.45;
   padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px));
@@ -188,6 +195,8 @@ dialog::backdrop { background: rgba(5, 7, 9, .7); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+</head>
+<body>
 
 <div class="app">
   <header class="bar">
@@ -1300,3 +1309,5 @@ document.addEventListener('paste', e => {
   prepare();
 })();
 </script>
+</body>
+</html>
