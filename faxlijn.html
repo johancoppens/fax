@@ -1,0 +1,1302 @@
+<title>Faxlijn 9600</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&family=Courier+Prime:wght@400;700&display=swap">
+<style>
+/* Layout: one screen. A top bar (title, steps, buttons), a "now" strip, then three columns: your sheet -> sound to picture -> the paper. */
+:root {
+  color-scheme: dark;
+  --bg: #12161b;
+  --panel: #1a2027;
+  --line: #2b333c;
+  --fg: #d9dee2;
+  --muted: #8b96a1;
+  --tx: #ffb547;        /* sender: amber */
+  --rx: #5fd0dc;        /* receiver: cyan */
+  --ok: #8fdc7a;
+  --bad: #ff6b5e;
+  --paper: #f3f1e8;
+  --ink: #1d1e2b;
+  --well: #0b0e11;
+  --f-display: "Chakra Petch", "Arial Narrow", sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.45;
+  padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px));
+  padding-block: 10px;
+}
+.app { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 10px; max-width: 1600px; margin: 0 auto; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; min-height: 0; }
+h1 { font-family: var(--f-display); font-weight: 700; font-size: 26px; line-height: 1; margin: 0; white-space: nowrap; }
+h1 span { color: var(--tx); }
+h2 { font-family: var(--f-display); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0; display: flex; align-items: center; gap: 6px; }
+
+/* top bar */
+.bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
+.brand { display: flex; align-items: center; gap: 8px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.steps li { font-family: var(--f-display); font-weight: 500; font-size: 13.5px; text-align: center; padding: 5px 4px; border-radius: 4px; background: var(--panel); color: var(--muted); border-bottom: 3px solid transparent; cursor: help; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.steps li .n { opacity: .65; margin-right: 4px; }
+.steps li.done { color: var(--fg); }
+.steps li.on { color: var(--bg); background: var(--fg); }
+.steps li.on.tx { border-bottom-color: var(--tx); }
+.steps li.on.rx { border-bottom-color: var(--rx); }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+button { font-family: var(--f-display); font-weight: 700; font-size: 14px; letter-spacing: .03em; border-radius: 4px; padding: 7px 12px; cursor: pointer;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); white-space: nowrap; }
+button.primary { background: var(--tx); color: #1b1307; border-color: var(--tx); }
+button.small { font-size: 12.5px; padding: 4px 9px; }
+button:hover:not(:disabled) { filter: brightness(1.12); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, textarea:focus-visible, input:focus-visible, .drop:focus-visible, [data-tip]:focus-visible { outline: 2px solid var(--rx); outline-offset: 2px; }
+.vol { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.vol input { width: 70px; }
+.q { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); font: 600 11px/1 var(--f-mono);
+  background: transparent; padding: 0; cursor: help; letter-spacing: 0; flex: none; text-transform: none; }
+.q:hover, .q:focus-visible { color: var(--bg); background: var(--rx); border-color: var(--rx); }
+
+/* now strip */
+.now { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: center; }
+.stepnow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; min-height: 44px; }
+.stepnum { font-family: var(--f-display); font-weight: 700; font-size: 38px; line-height: 1; color: var(--tx); min-width: 1ch; text-align: center; }
+.stepnow h3 { font-family: var(--f-display); font-weight: 700; font-size: 17px; margin: 0; line-height: 1.2; }
+.stepnow p { margin: 1px 0 0; font-size: 13.5px; }
+.timeline { position: relative; display: flex; height: 20px; border-radius: 3px; overflow: hidden; background: var(--well); }
+.timeline .s { height: 100%; display: flex; align-items: center; justify-content: center; font-family: var(--f-mono); font-size: 10px; overflow: hidden; white-space: nowrap; color: var(--well); font-weight: 600; }
+.timeline .s.tx { background: color-mix(in srgb, var(--tx) 70%, var(--well)); }
+.timeline .s.rx { background: color-mix(in srgb, var(--rx) 70%, var(--well)); }
+.timeline .cur { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--fg); left: 0; pointer-events: none; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 4px; align-items: center; }
+.legend .timer { margin-left: auto; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+
+/* three columns */
+.cols { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.35fr) minmax(0, 1.15fr); gap: 10px; min-height: 0; }
+.col { display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; overflow: auto; }
+
+/* left: your sheet */
+.orig { background: #fff; width: 100%; height: auto; aspect-ratio: 1728 / 1000; display: block; }
+.drop { border: 2px dashed var(--line); border-radius: 6px; padding: 8px; text-align: center; color: var(--muted); font-size: 13px; cursor: pointer; line-height: 1.35; }
+.drop.over { border-color: var(--tx); color: var(--fg); background: color-mix(in srgb, var(--tx) 8%, transparent); }
+.drop strong { color: var(--fg); font-weight: 600; }
+.drop kbd { font-family: var(--f-mono); font-size: 11.5px; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; color: var(--fg); }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.opts { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.opts label { display: flex; align-items: center; gap: 5px; }
+textarea { width: 100%; min-height: 54px; flex: 0 0 auto; background: var(--well); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; resize: vertical; }
+textarea:disabled { opacity: .45; }
+.sendinfo { font-size: 12.5px; color: var(--muted); margin: 0; }
+.sendinfo b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* middle: the chain */
+.chain { display: grid; grid-template-rows: repeat(4, auto); gap: 0; }
+.link { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.link:first-of-type { border-top: 0; padding-top: 4px; }
+.lh { font-family: var(--f-display); font-weight: 700; font-size: 15px; line-height: 1.2; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.lh .t { display: flex; align-items: center; gap: 6px; }
+.lh b { display: inline-grid; place-items: center; width: 21px; height: 21px; border-radius: 50%; background: var(--fg); color: var(--bg); font-size: 12px; flex: none; }
+.lh small { font-family: var(--f-body); font-weight: 400; font-size: 11.5px; color: var(--muted); }
+.lc { min-width: 0; display: grid; gap: 4px; }
+.cap { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.cap b { color: var(--fg); font-weight: 600; }
+canvas { display: block; max-width: 100%; }
+.scope { width: 100%; height: 64px; background: var(--well); border-radius: 3px; }
+.bits { font-family: var(--f-mono); font-size: 14px; letter-spacing: .05em; word-break: break-all; line-height: 1.3; background: var(--well); border-radius: 3px; padding: 5px 8px; height: calc(2 * 1.3em + 10px); overflow: hidden; }
+.meaning { background: var(--well); border-radius: 3px; padding: 5px 8px; height: 76px; overflow: hidden; display: grid; gap: 3px; align-content: start; }
+.say { font-size: 13.5px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.say .w { font-family: var(--f-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; margin-right: 6px; }
+.say.tx .w { color: var(--tx); } .say.rx .w { color: var(--rx); }
+.say .pk { color: var(--muted); font-size: 11.5px; }
+.runs { display: flex; flex-wrap: wrap; gap: 3px; }
+.runs span { font-family: var(--f-mono); font-size: 12px; padding: 0 6px; border-radius: 3px; }
+.runs .w { background: var(--paper); color: var(--ink); }
+.runs .b { background: var(--ink); color: var(--paper); border: 1px solid #444a5a; }
+.runs .more { color: var(--muted); }
+.linec { width: 100%; height: 26px; image-rendering: pixelated; background: var(--paper); border-radius: 2px; }
+.ok { color: var(--ok); } .bad { color: var(--bad); }
+
+/* right: the paper */
+.machine { background: #262c33; border: 1px solid var(--line); border-radius: 10px 10px 4px 4px; padding: 10px 10px 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.slot { height: 9px; background: #07090b; border-radius: 3px; margin: 0 4px; box-shadow: inset 0 2px 4px #000; flex: none; }
+.paper { position: relative; margin: -12px 10px 0; background: var(--paper); box-shadow: 0 6px 18px rgba(0,0,0,.45); flex: none; }
+.paper canvas { width: 100%; height: auto; aspect-ratio: 1728 / 1000; display: block; }
+.paper .head { position: absolute; left: 0; right: 0; height: 2px; background: var(--bad); box-shadow: 0 0 6px var(--bad); top: 0; opacity: 0; }
+.paper .wait { position: absolute; inset: 0; display: grid; place-items: center; color: #8d8a7c; font-family: var(--f-mono); font-size: 12.5px; text-align: center; padding: 12px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 12px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; padding: 4px 2px 10px; }
+.stats b { color: var(--fg); font-weight: 600; }
+.stats span { display: flex; gap: 5px; align-items: center; }
+
+/* tooltip */
+#tip { position: fixed; z-index: 50; max-width: 300px; background: var(--fg); color: var(--bg); font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 5px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5); pointer-events: none; opacity: 0; transition: opacity .12s; }
+#tip.show { opacity: 1; }
+#tip b { font-weight: 600; }
+
+/* dialogs */
+dialog { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 0; width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(5, 7, 9, .7); }
+.dlg { padding: 16px 18px; display: grid; gap: 14px; }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.dlg-head h3 { font-family: var(--f-display); font-size: 22px; margin: 0; }
+.dlg .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.dlg h4 { font-family: var(--f-display); font-size: 17px; margin: 0 0 6px; }
+.dlg ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+.dlg li::marker { font-family: var(--f-display); color: var(--tx); }
+.dlg p { margin: 0 0 8px; }
+.dlg .fine { color: var(--muted); font-size: 12.5px; }
+#camv { width: 100%; max-height: 60vh; background: #000; border-radius: 4px; transform: scaleX(-1); }
+#camBtn { align-self: flex-start; }
+.specwrap { position: relative; }
+.spectro { width: 100%; height: auto; background: var(--well); border-radius: 3px; }
+.specwrap .fl { position: absolute; right: 4px; font-family: var(--f-mono); font-size: 10px; color: var(--muted); transform: translateY(-50%); background: rgba(11,14,17,.7); padding: 0 3px; }
+.demod { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: start; }
+.demod canvas { background: var(--well); border-radius: 3px; width: 100%; height: auto; }
+.demod p { font-size: 13px; color: var(--muted); }
+.log { list-style: none; margin: 0; padding: 0; max-height: 200px; overflow: auto; font-size: 12.5px; display: grid; gap: 5px; }
+.log li { display: grid; grid-template-columns: 52px 74px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.log .t { font-family: var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.log .who { font-family: var(--f-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.log .who.tx { color: var(--tx); } .log .who.rx { color: var(--rx); } .log .who.mon { color: var(--muted); }
+.log b { font-family: var(--f-mono); }
+.log .d { color: var(--muted); }
+
+/* narrow or short screens: let it scroll instead of squeezing */
+@media (max-width: 1100px) {
+  .bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .steps { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 900px), (max-height: 560px) {
+  html, body { height: auto; }
+  .app { height: auto; }
+  .cols, .now { grid-template-columns: minmax(0, 1fr); }
+  .col { overflow: visible; }
+  .dlg .two, .demod { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .bar { grid-template-columns: minmax(0, 1fr); }
+  .controls { justify-content: flex-start; }
+  .steps li { font-size: 11px; }
+  .steps li .n { display: none; }
+  .link { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .lh { flex-direction: row; align-items: center; }
+  .log li { grid-template-columns: 46px minmax(0, 1fr); }
+  .log li .who, .log li .m { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <h1>Hoe werkt een <span>fax</span>?</h1>
+      <button class="small" id="openHelp">Uitleg</button>
+      <button class="small" id="openTech">Techniek</button>
+    </div>
+    <ol class="steps" id="steps">
+      <li data-s="1" tabindex="0" data-tip="<b>Bellen.</b> Jouw fax piept op 1100 Hz: ik ben een fax. De andere fax neemt op met 2100 Hz."><span class="n">1</span>Bellen</li>
+      <li data-s="2" tabindex="0" data-tip="<b>Afspreken.</b> De faxen zeggen wie ze zijn en wat ze kunnen, en kiezen een snelheid. Dat gekwetter is data op 300 bits per seconde."><span class="n">2</span>Afspreken</li>
+      <li data-s="3" tabindex="0" data-tip="<b>Testen.</b> Anderhalve seconde alleen nullen op topsnelheid. Komen ze goed aan, dan is de lijn goed genoeg."><span class="n">3</span>Testen</li>
+      <li data-s="4" tabindex="0" data-tip="<b>Beeld.</b> Het blad gaat over de lijn met 9600 bits per seconde. Zoveel data klinkt als ruis."><span class="n">4</span>Beeld</li>
+      <li data-s="5" tabindex="0" data-tip="<b>Ophangen.</b> Laatste pagina? Goed ontvangen? Daag!"><span class="n">5</span>Ophangen</li>
+    </ol>
+    <div class="controls">
+      <button id="play" class="primary">Bel en verstuur</button>
+      <button id="pause" disabled>Pauze</button>
+      <button id="skip" data-tip="Sla het bellen, afspreken en testen over en ga meteen naar het beeld.">Naar beeld</button>
+      <button id="reset">Opnieuw</button>
+      <label class="vol" for="vol">Vol <input id="vol" type="range" min="0" max="1" step="0.05" value="0.6"></label>
+    </div>
+  </header>
+
+  <section class="panel now">
+    <div class="stepnow">
+      <div class="stepnum" id="stepNum">▸</div>
+      <div><h3 id="stepTitle">Klaar om te bellen</h3><p id="stepText">Kies wat je wilt versturen en druk op Bel en verstuur.</p></div>
+    </div>
+    <div>
+      <div class="timeline" id="timeline"><div class="cur" id="cur"></div></div>
+      <div class="legend"><span><i class="dot" style="background:var(--tx)"></i>jouw fax praat</span><span><i class="dot" style="background:var(--rx)"></i>de andere fax praat</span><span class="timer" id="timer">0:00 / 0:00</span></div>
+    </div>
+  </section>
+
+  <main class="cols">
+    <section class="panel col">
+      <h2>1 · Jouw blad <button class="q" data-tip="De <b>scanner</b> verdeelt het blad in regels van 1728 puntjes en maakt van elk puntje zwart of wit: 1 bit. Dat is de eerste stap van <b>analoog naar digitaal</b>.">?</button></h2>
+      <canvas class="orig" id="orig" width="1728" height="481"></canvas>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Afbeelding kiezen">
+        <strong>Sleep een afbeelding hierheen</strong> of klik.<br>Screenshot? <kbd>Ctrl</kbd>+<kbd>V</kbd>
+      </div>
+      <input id="img" class="vh" type="file" accept="image/*" tabindex="-1">
+      <div class="opts">
+        <label><input id="dither" type="checkbox"> foto-stand</label>
+        <button class="q" data-tip="Grijs wordt een patroon van zwarte puntjes, zoals in de krant. Er valt dan veel minder samen te vatten, dus het duurt veel langer.">?</button>
+        <button id="sample" class="small" hidden>Voorbeeldbrief</button>
+      </div>
+      <button id="camBtn" class="small">Foto met de webcam</button>
+      <input id="camIn" class="vh" type="file" accept="image/*" capture="user" tabindex="-1">
+      <textarea id="msg" aria-label="Bericht op de brief">Dit blad reisde als geluid door de telefoonlijn.
+Elke regel is 1728 puntjes, zwart of wit.</textarea>
+      <p class="sendinfo" id="sendinfo"></p>
+    </section>
+
+    <section class="panel col">
+      <h2>2 · Bij de ontvanger: van geluid terug naar beeld</h2>
+      <div class="chain">
+        <div class="link">
+          <div class="lh"><span class="t"><b>1</b>Geluid <button class="q" data-tip="Dit komt door de telefoonlijn. <b>Oranje</b> praat jouw fax, <b>blauw</b> de andere. Een telefoonlijn laat alleen tonen tussen ongeveer 300 en 3400 Hz door, dus alle bits moeten in die tonen passen.">?</button></span><small>door de lijn</small></div>
+          <div class="lc"><canvas class="scope" id="scope" width="720" height="64"></canvas><p class="cap" id="capSound">De lijn is stil.</p></div>
+        </div>
+        <div class="link">
+          <div class="lh"><span class="t"><b>2</b>Bits <button class="q" data-tip="Het <b>modem</b> luistert naar het geluid en maakt er enen en nullen van: van <b>analoog terug naar digitaal</b>. Bij het afspreken 300 bits per seconde, bij het beeld 9600.">?</button></span><small>enen en nullen</small></div>
+          <div class="lc"><div class="bits" id="bits"></div><p class="cap" id="capBits">Nog geen bits.</p></div>
+        </div>
+        <div class="link">
+          <div class="lh"><span class="t"><b>3</b><span id="box3">Betekenis</span> <button class="q" data-tip="Bij het <b>afspreken</b> vormen de bits pakketjes met een controlegetal, zodat fouten opvallen. Bij het <b>beeld</b> zijn de bits een samenvatting: “wit 312” in plaats van 312 keer “wit”. Wat vaak voorkomt krijgt een korte code.">?</button></span><small id="box3s">wat ze zeggen</small></div>
+          <div class="lc"><div class="meaning" id="meaning"></div><p class="cap" id="capMeaning"></p></div>
+        </div>
+        <div class="link">
+          <div class="lh"><span class="t"><b>4</b>Puntjes <button class="q" data-tip="De uitgepakte regel: 1728 puntjes, 8 per mm over een A4. Er zijn maar 3,85 regels per mm, daarom zijn faxletters wat platgedrukt.">?</button></span><small>één regel</small></div>
+          <div class="lc"><canvas class="linec" id="linec" width="1728" height="1"></canvas><p class="cap" id="capLine">Nog geen beeldregel.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="machine">
+        <h2>3 · Wat eruit komt <button class="q" data-tip="<b>Thermisch papier</b> wordt zwart waar het warm wordt. De printkop (de rode lijn) verwarmt per regel de zwarte puntjes. Geen inkt nodig.">?</button></h2>
+        <div class="slot"></div>
+        <div class="paper">
+          <canvas id="paper" width="1728" height="481"></canvas>
+          <div class="head" id="head"></div>
+          <div class="wait" id="wait">Het papier wacht op de eerste beeldregel.</div>
+        </div>
+        <div class="stats">
+          <span>regels: <b id="sLines">0</b> / <b id="sLinesT">0</b></span>
+          <span>fouten: <b id="sErr">0</b></span>
+          <span>verstuurd: <b id="sBits">0</b> bits</span>
+          <span>zonder samenvatten: <b id="sRaw">0</b> <button class="q" data-tip="1728 puntjes × het aantal regels. Zoveel bits zou het zijn als je elk puntje apart verstuurt.">?</button></span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="tip" role="tooltip"></div>
+
+<dialog id="cam">
+  <div class="dlg">
+    <div class="dlg-head"><h3>Foto met de webcam</h3><button class="small" data-close>Sluiten</button></div>
+    <video id="camv" autoplay playsinline muted></video>
+    <div class="opts"><button id="snap" class="primary">Neem de foto</button><span>Kijk in de camera. Een fax kent alleen zwart en wit, dus zorg voor genoeg licht.</span></div>
+  </div>
+</dialog>
+
+<dialog id="help">
+  <div class="dlg">
+    <div class="dlg-head"><h3>Uitleg</h3><button class="small" data-close>Sluiten</button></div>
+    <div class="two">
+      <div>
+        <h4>Wat gebeurt er?</h4>
+        <ol>
+          <li><b>Scannen.</b> De fax verdeelt het blad in regels van 1728 puntjes. Elk puntje wordt zwart of wit: 1 bit.</li>
+          <li><b>Samenvatten.</b> In plaats van 1728 keer “wit” stuurt de fax “wit 1728” als korte code. Zo wordt een blad vaak 5 tot 20 keer kleiner.</li>
+          <li><b>Omzetten in geluid.</b> Het modem maakt van de bits geluid dat door een gewone telefoonlijn kan.</li>
+          <li><b>Terug omzetten.</b> De ontvanger luistert, maakt van het geluid weer bits, pakt de samenvatting uit en print de puntjes.</li>
+        </ol>
+      </div>
+      <div>
+        <h4>Is een fax een A/D-omzetter?</h4>
+        <p>Een beetje. De <b>scanner</b> zet licht (analoog) om in zwart of wit (digitaal): dat is A/D. Het <b>modem</b> zet bits om in geluid (D/A), en de ontvanger zet dat geluid weer om in bits (A/D). De <b>printer</b> maakt van bits weer iets wat je ziet.</p>
+        <p>Het beeld is dus al digitaal voor het de lijn op gaat. Het geluid is alleen de manier om bits over een telefoonlijn te krijgen, die gemaakt was voor stemmen.</p>
+        <p class="fine">De allereerste faxen (jaren 70) waren wel echt analoog: hoe donkerder het puntje, hoe lager de toon. Deze pagina bootst een Group 3-fax na, de soort die vanaf 1980 overal stond.</p>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="tech">
+  <div class="dlg">
+    <div class="dlg-head"><h3>Techniek</h3><button class="small" data-close>Sluiten</button></div>
+    <div>
+      <h2 style="margin-bottom:6px">Spectrogram · 0 tot 4000 Hz, laatste 6 s</h2>
+      <div class="specwrap">
+        <canvas class="spectro" id="spec" width="600" height="172"></canvas>
+        <span class="fl" style="top:calc(100% - 2100/4000*100%)">2100 CED</span>
+        <span class="fl" style="top:calc(100% - 1850/4000*100%)">1850 · 0</span>
+        <span class="fl" style="top:calc(100% - 1650/4000*100%)">1650 · 1</span>
+        <span class="fl" style="top:calc(100% - 1100/4000*100%)">1100 CNG</span>
+      </div>
+    </div>
+    <div class="demod">
+      <div style="display:grid;gap:8px">
+        <canvas id="const" width="240" height="240" aria-label="Constellatiediagram"></canvas>
+        <canvas id="fsk" width="240" height="64" aria-label="FSK-energie"></canvas>
+      </div>
+      <div>
+        <p>V.29 stuurt 2400 symbolen per seconde op een draaggolf van 1700 Hz. Elk symbool is één van 16 punten (fase en amplitude): 4 bits. Cyaan zijn de trainingspunten, oranje de data. De bits worden gescrambled, zodat zelfs een wit blad als ruis klinkt.</p>
+        <p>V.21 (de handdruk) gebruikt FSK: 1650 Hz is een 1, 1850 Hz een 0, 300 bit/s, in HDLC-frames met een CRC (T.30). Het beeld is gecodeerd met Modified Huffman (T.4).</p>
+        <p>Vereenvoudigd: deze ontvanger kent de klok en de draaggolffase al, de pauze na CNG is korter, en de bits in DIS en DCS zijn niet exact. Geluid op 24 kHz met wat lijnruis.</p>
+      </div>
+    </div>
+    <div>
+      <h2 style="margin-bottom:6px">Protocol op de lijn</h2>
+      <ul class="log" id="log"></ul>
+    </div>
+  </div>
+</dialog>
+
+<script id="core">
+'use strict';
+// ===== Core: line synthesis and the line monitor. No DOM in here. =====
+const SR = 24000;          // samples per second on the "line"
+const WIDTH = 1728;        // pixels per scan line (A4 at 8 dots/mm)
+const SPS = 10;            // samples per V.29 symbol (2400 baud)
+const SPB = 80;            // samples per V.21 bit (300 bit/s)
+const FC = 1700;           // V.29 carrier in Hz
+const V29_SCALE = 0.075;
+const ALPHA = 0.3, SPAN = 4, HALF = SPAN * SPS;
+const R2 = Math.SQRT2;
+
+// Root raised cosine pulse, used both to shape and to receive (matched filter).
+const TAPS = (() => {
+  const h = [];
+  for (let j = -HALF; j <= HALF; j++) {
+    const t = j / SPS;
+    let v;
+    if (j === 0) v = 1 - ALPHA + 4 * ALPHA / Math.PI;
+    else if (Math.abs(Math.abs(t) - 1 / (4 * ALPHA)) < 1e-9)
+      v = ALPHA / R2 * ((1 + 2 / Math.PI) * Math.sin(Math.PI / (4 * ALPHA)) + (1 - 2 / Math.PI) * Math.cos(Math.PI / (4 * ALPHA)));
+    else v = (Math.sin(Math.PI * t * (1 - ALPHA)) + 4 * ALPHA * t * Math.cos(Math.PI * t * (1 + ALPHA))) / (Math.PI * t * (1 - (4 * ALPHA * t) ** 2));
+    h.push(v);
+  }
+  return h;
+})();
+const H2 = TAPS.reduce((a, v) => a + v * v, 0);
+
+// ----- T.4 Modified Huffman code tables -----
+const WT = ['00110101','000111','0111','1000','1011','1100','1110','1111','10011','10100','00111','01000','001000','000011','110100','110101',
+  '101010','101011','0100111','0001100','0001000','0010111','0000011','0000100','0101000','0101011','0010011','0100100','0011000','00000010','00000011','00011010',
+  '00011011','00010010','00010011','00010100','00010101','00010110','00010111','00101000','00101001','00101010','00101011','00101100','00101101','00000100','00000101','00001010',
+  '00001011','01010010','01010011','01010100','01010101','00100100','00100101','01011000','01011001','01011010','01011011','01001010','01001011','00110010','00110011','00110100'];
+const WM = {64:'11011',128:'10010',192:'010111',256:'0110111',320:'00110110',384:'00110111',448:'01100100',512:'01100101',576:'01101000',640:'01100111',
+  704:'011001100',768:'011001101',832:'011010010',896:'011010011',960:'011010100',1024:'011010101',1088:'011010110',1152:'011010111',1216:'011011000',
+  1280:'011011001',1344:'011011010',1408:'011011011',1472:'010011000',1536:'010011001',1600:'010011010',1664:'011000',1728:'010011011'};
+const BT = ['0000110111','010','11','10','011','0011','0010','00011','000101','000100','0000100','0000101','0000111','00000100','00000111','000011000',
+  '0000010111','0000011000','0000001000','00001100111','00001101000','00001101100','00000110111','00000101000','00000010111','00000011000','000011001010','000011001011','000011001100','000011001101','000001101000','000001101001',
+  '000001101010','000001101011','000011010010','000011010011','000011010100','000011010101','000011010110','000011010111','000001101100','000001101101','000011011010','000011011011','000001010100','000001010101','000001010110','000001010111',
+  '000001100100','000001100101','000001010010','000001010011','000000100100','000000110111','000000111000','000000100111','000000101000','000001011000','000001011001','000000101011','000000101100','000001011010','000001100110','000001100111'];
+const BM = {64:'0000001111',128:'000011001000',192:'000011001001',256:'000001011011',320:'000000110011',384:'000000110100',448:'000000110101',512:'0000001101100',
+  576:'0000001101101',640:'0000001001010',704:'0000001001011',768:'0000001001100',832:'0000001001101',896:'0000001110010',960:'0000001110011',1024:'0000001110100',
+  1088:'0000001110101',1152:'0000001110110',1216:'0000001110111',1280:'0000001010010',1344:'0000001010011',1408:'0000001010100',1472:'0000001010101',1536:'0000001011010',
+  1600:'0000001011011',1664:'0000001100100',1728:'0000001100101'};
+const EOL = '000000000001';
+
+function buildTrie(term, makeup) {
+  const root = {};
+  const add = (code, run, mk) => {
+    let n = root;
+    for (const c of code) { if (n.run !== undefined) throw new Error('prefix clash ' + code); n = n[c] || (n[c] = {}); }
+    if (n.run !== undefined || n[0] || n[1]) throw new Error('prefix clash ' + code);
+    n.run = run; n.mk = mk;
+  };
+  term.forEach((c, i) => add(c, i, false));
+  for (const k in makeup) add(makeup[k], +k, true);
+  return root;
+}
+const TRIE = [buildTrie(WT, WM), buildTrie(BT, BM)];
+
+function mhEncodePage(rows) {
+  const bits = [];
+  const put = s => { for (const c of s) bits.push(c === '1' ? 1 : 0); };
+  const run = (len, color) => {
+    if (len >= 64) { const m = Math.floor(len / 64) * 64; put((color ? BM : WM)[m]); len -= m; }
+    put((color ? BT : WT)[len]);
+  };
+  for (const row of rows) {
+    put(EOL);
+    let col = 0, color = 0;
+    while (col < WIDTH) {
+      let n = 0;
+      while (col + n < WIDTH && row[col + n] === color) n++;
+      run(n, color); col += n; color ^= 1;
+    }
+  }
+  for (let i = 0; i < 6; i++) put(EOL);   // RTC: return to control
+  return Uint8Array.from(bits);
+}
+
+class MHDecoder {
+  constructor(on) { this.on = on; this.mode = 'eol'; this.z = 0; this.eols = 0; this.done = false; this.newLine(); }
+  newLine() { this.row = new Uint8Array(WIDTH); this.col = 0; this.color = 0; this.node = TRIE[0]; this.acc = 0; this.any = false; }
+  push(b) {
+    if (this.done) return;
+    if (b === 0) this.z++;
+    else { if (this.z >= 11) { this.z = 0; this.eol(); return; } this.z = 0; }
+    if (this.mode !== 'line' || !this.node) return;
+    this.node = this.node[b];
+    if (!this.node) return;   // invalid code: the next EOL reports the broken line
+    if (this.node.run === undefined) return;
+    this.any = true;
+    this.acc += this.node.run;
+    if (this.node.mk) { this.node = TRIE[this.color]; return; }
+    const len = this.acc;
+    if (this.color) this.row.fill(1, this.col, Math.min(WIDTH, this.col + len));
+    this.col += len; this.on.run(this.color, len);
+    this.acc = 0; this.color ^= 1; this.node = TRIE[this.color];
+    if (this.col >= WIDTH) { this.on.line(this.row, this.col === WIDTH); this.mode = 'eol'; this.eols = 0; }
+  }
+  eol() {
+    if (this.mode === 'line' && this.any) { this.on.line(this.row, false); this.eols = 0; }
+    this.eols++;
+    this.on.eol(this.eols);
+    if (this.eols >= 6) { this.done = true; this.on.end(); return; }
+    this.mode = 'line'; this.newLine();
+  }
+}
+
+// ----- HDLC (T.30 frames over V.21) -----
+function crcRaw(bytes) {
+  let c = 0xFFFF;
+  for (const b of bytes) { c ^= b; for (let i = 0; i < 8; i++) c = (c & 1) ? (c >>> 1) ^ 0x8408 : c >>> 1; }
+  return c;
+}
+function hdlcBits(frames, nflags) {
+  const bits = [];
+  const flag = () => { for (const b of [0,1,1,1,1,1,1,0]) bits.push(b); };
+  for (let i = 0; i < nflags; i++) flag();
+  for (const f of frames) {
+    const body = [0xFF, f.final ? 0x13 : 0x03, f.fcf, ...(f.fif || [])];
+    const fcs = (~crcRaw(body)) & 0xFFFF;
+    let ones = 0;
+    for (const byte of [...body, fcs & 0xFF, fcs >> 8])
+      for (let k = 0; k < 8; k++) {
+        const b = (byte >> k) & 1;
+        bits.push(b);
+        if (b) { if (++ones === 5) { bits.push(0); ones = 0; } } else ones = 0;
+      }
+    flag();
+  }
+  flag(); flag();
+  return bits;
+}
+class HdlcRx {
+  constructor(onFrame) { this.on = onFrame; this.reset(); }
+  reset() { this.ones = 0; this.buf = []; this.sync = false; }
+  push(b) {
+    if (b) { this.ones++; if (this.ones > 6) { this.buf = []; this.sync = false; return; } this.buf.push(1); return; }
+    if (this.ones === 6) { this.buf.length = Math.max(0, this.buf.length - 7); this.emit(); this.buf = []; this.ones = 0; this.sync = true; return; }
+    if (this.ones === 5) { this.ones = 0; return; }   // stuffed zero
+    this.ones = 0; this.buf.push(0);
+  }
+  emit() {
+    if (!this.sync || this.buf.length < 32 || this.buf.length % 8) return;
+    const bytes = [];
+    for (let i = 0; i < this.buf.length; i += 8) { let v = 0; for (let k = 0; k < 8; k++) v |= this.buf[i + k] << k; bytes.push(v); }
+    this.on({ addr: bytes[0], ctrl: bytes[1], fcf: bytes[2], fif: bytes.slice(3, -2), ok: crcRaw(bytes) === 0xF0B8 });
+  }
+}
+
+const FCF = {
+  0x40: ['CSI', 'nummer van de ontvanger'], 0x43: ['TSI', 'nummer van de verzender'],
+  0x80: ['DIS', 'wat de ontvanger kan'], 0x83: ['DCS', 'wat de verzender kiest'],
+  0x84: ['CFR', 'training goed, verstuur maar'], 0x8C: ['MCF', 'pagina goed ontvangen'],
+  0x2F: ['EOP', 'einde van het document'], 0xFB: ['DCN', 'verbinding verbreken'],
+};
+const FIF_TXT = { DIS: 'V.29 9600 en V.27ter 4800 · 1728 punten · MH', DCS: '9600 bit/s V.29 · standaardresolutie · 1728 punten · MH' };
+const TX_ID = '+32 3 555 98 76', RX_ID = '+32 9 555 01 23';
+const ident = s => s.padEnd(20, ' ').split('').reverse().map(c => c.charCodeAt(0));
+const fifBits = (list, n) => { const a = new Array(n).fill(0); for (const b of list) a[(b - 1) >> 3] |= 1 << ((b - 1) & 7); return a; };
+
+// ----- V.29 -----
+const PH_OF = [1, 0, 2, 3, 6, 7, 5, 4];  // Q2Q3Q4 -> phase change in steps of 45 degrees
+const Q_OF = [1, 0, 2, 3, 7, 6, 4, 5];   // phase change -> Q2Q3Q4
+const TRAIN = { s1: 48, s2: 176, s3: 560, s4: 608 };   // cumulative symbol counts of the training segments
+function v29Point(phase, q1) {
+  const a = phase % 2 === 0 ? (q1 ? 5 : 3) : (q1 ? 3 * R2 : R2);
+  const t = phase * Math.PI / 4;
+  return [a * Math.cos(t), a * Math.sin(t)];
+}
+function v29Symbols(payload) {
+  const pts = [];
+  for (let k = 0; k < 48; k++) pts.push([0, 0]);
+  for (let k = 0; k < 128; k++) pts.push(k % 2 ? [3, -3] : [-3, 0]);
+  let pn = 0x2A, phase = 0;
+  for (let k = 0; k < 384; k++) {
+    const b = ((pn >> 5) ^ (pn >> 6)) & 1;
+    pn = ((pn << 1) | b) & 0x7F;
+    pts.push(b ? [-3, 3] : [3, 0]); phase = b ? 3 : 0;
+  }
+  const n = Math.ceil((192 + payload.length) / 4) * 4 + 32;
+  const bits = new Uint8Array(n).fill(1);
+  bits.set(payload, 192);
+  let sc = 0;
+  for (let i = 0; i < n; i += 4) {
+    const q = [0, 0, 0, 0];
+    for (let j = 0; j < 4; j++) {
+      const o = bits[i + j] ^ ((sc >> 17) & 1) ^ ((sc >> 22) & 1);   // scrambler 1 + x^-18 + x^-23
+      sc = ((sc << 1) | o) & 0x7FFFFF; q[j] = o;
+    }
+    phase = (phase + PH_OF[q[1] * 4 + q[2] * 2 + q[3]]) & 7;
+    pts.push(v29Point(phase, q[0]));
+  }
+  return pts;
+}
+function v29Rx(x, c) {
+  const w = 2 * Math.PI * FC / SR;
+  let re = 0, im = 0;
+  for (let j = -HALF; j <= HALF; j++) {
+    const n = c + j, v = (x[n] || 0) * TAPS[j + HALF];
+    re += v * Math.cos(w * n); im -= v * Math.sin(w * n);
+  }
+  const g = 2 / (H2 * V29_SCALE);
+  return [re * g, im * g];
+}
+
+// ----- Synthesis -----
+class Writer {
+  constructor() { this.a = new Float32Array(SR * 40); this.n = 0; }
+  grow(k) {
+    if (this.n + k <= this.a.length) return;
+    let m = this.a.length; while (m < this.n + k) m *= 2;
+    const b = new Float32Array(m); b.set(this.a.subarray(0, this.n)); this.a = b;
+  }
+}
+function buildCall(rows) {
+  const W = new Writer(), segs = [];
+  const add = (o, fn) => { o.start = W.n; fn(); o.end = W.n; segs.push(o); return o; };
+  const gap = sec => add({ kind: 'silence' }, () => { const N = Math.round(sec * SR); W.grow(N); W.n += N; });
+  const tone = (f, sec, amp) => {
+    const N = Math.round(sec * SR), r = Math.round(0.005 * SR); W.grow(N);
+    for (let i = 0; i < N; i++) { const e = Math.min(1, i / r, (N - 1 - i) / r); W.a[W.n] = amp * e * Math.sin(2 * Math.PI * f * W.n / SR); W.n++; }
+  };
+  const v21 = (o, frames) => {
+    const bits = hdlcBits(frames, 38);   // ~1 s of flags as preamble
+    return add({ kind: 'fsk', nbits: bits.length, ...o }, () => {
+      const N = bits.length * SPB, r = Math.round(0.004 * SR); W.grow(N);
+      let ph = 0, i = 0;
+      for (const b of bits) {
+        const w = 2 * Math.PI * (b ? 1650 : 1850) / SR;
+        for (let j = 0; j < SPB; j++, i++) { const e = Math.min(1, i / r, (N - 1 - i) / r); W.a[W.n++] = 0.42 * e * Math.sin(ph); ph += w; }
+      }
+    });
+  };
+  const v29 = (o, payload) => {
+    const pts = v29Symbols(payload);
+    return add({ kind: 'v29', nsym: pts.length, payloadBits: payload.length, ...o }, () => {
+      const N = (pts.length + 2 * SPAN) * SPS;
+      const I = new Float32Array(N), Q = new Float32Array(N);
+      pts.forEach(([a, b], k) => {
+        if (!a && !b) return;
+        const c = HALF + k * SPS;
+        for (let j = -HALF; j <= HALF; j++) { const h = TAPS[j + HALF]; I[c + j] += a * h; Q[c + j] += b * h; }
+      });
+      W.grow(N);
+      const w = 2 * Math.PI * FC / SR;
+      for (let i = 0; i < N; i++) { const n = W.n; W.a[W.n++] = V29_SCALE * (I[i] * Math.cos(w * n) - Q[i] * Math.sin(w * n)); }
+    });
+  };
+
+  const image = mhEncodePage(rows);
+  gap(0.4);
+  add({ kind: 'tone', f: 1100, who: 'tx', label: 'CNG', lcd: 'CNG 1100 HZ  -  IK BEN EEN FAX' }, () => tone(1100, 0.5, 0.4));
+  gap(1.2);
+  add({ kind: 'tone', f: 2100, who: 'rx', label: 'CED', lcd: 'CED 2100 HZ  -  ONTVANGER NEEMT OP' }, () => tone(2100, 2.6, 0.4));
+  gap(0.075);
+  v21({ who: 'rx', label: 'CSI·DIS', lcd: 'V.21  ONTVANGER: WIE EN WAT IK KAN' }, [{ fcf: 0x40, fif: ident(RX_ID) }, { fcf: 0x80, fif: fifBits([10, 11, 12, 19], 3), final: true }]);
+  gap(0.075);
+  v21({ who: 'tx', label: 'TSI·DCS', lcd: 'V.21  VERZENDER KIEST 9600 BIT/S' }, [{ fcf: 0x43, fif: ident(TX_ID) }, { fcf: 0x83, fif: fifBits([10, 11], 3), final: true }]);
+  gap(0.075);
+  v29({ who: 'tx', label: 'TCF', lcd: 'TCF  TRAINING + 1,5 S NULLEN', purpose: 'tcf' }, new Uint8Array(14400));
+  gap(0.075);
+  v21({ who: 'rx', label: 'CFR', lcd: 'V.21  ONTVANGER: LIJN IS GOED' }, [{ fcf: 0x84, final: true }]);
+  gap(0.075);
+  const page = v29({ who: 'tx', label: 'BEELD  V.29 9600', lcd: 'BEELD  V.29 9600 BIT/S', purpose: 'page' }, image);
+  gap(0.075);
+  v21({ who: 'tx', label: 'EOP', lcd: 'V.21  EINDE VAN HET DOCUMENT' }, [{ fcf: 0x2F, final: true }]);
+  gap(0.075);
+  v21({ who: 'rx', label: 'MCF', lcd: 'V.21  PAGINA GOED ONTVANGEN' }, [{ fcf: 0x8C, final: true }]);
+  gap(0.075);
+  v21({ who: 'tx', label: 'DCN', lcd: 'V.21  OPHANGEN' }, [{ fcf: 0xFB, final: true }]);
+  gap(0.6);
+
+  const audio = W.a.slice(0, W.n);
+  let seed = 12345;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296;
+  for (let i = 0; i < audio.length; i += 2) {
+    const u = Math.max(rnd(), 1e-12), v = rnd(), r = Math.sqrt(-2 * Math.log(u)) * 0.0025;
+    audio[i] += r * Math.cos(2 * Math.PI * v);
+    if (i + 1 < audio.length) audio[i + 1] += r * Math.sin(2 * Math.PI * v);
+  }
+  return { audio, segs, imageBits: image.length, pageSeg: page, lines: rows.length };
+}
+
+// ----- Line monitor: a tap on the line that decodes both directions -----
+function goertzel(x, a, b, f) {
+  const w = 2 * Math.PI * f / SR, c = 2 * Math.cos(w);
+  let s1 = 0, s2 = 0;
+  for (let n = a; n < b; n++) { const s = (x[n] || 0) + c * s1 - s2; s2 = s1; s1 = s; }
+  return (s1 * s1 + s2 * s2 - c * s1 * s2) / ((b - a) * (b - a) / 4);
+}
+function corr(x, a, b, f) {
+  const w = 2 * Math.PI * f / SR;
+  let re = 0, im = 0;
+  for (let n = a; n < b; n++) { re += x[n] * Math.cos(w * n); im += x[n] * Math.sin(w * n); }
+  return re * re + im * im;
+}
+class Monitor {
+  constructor(call, ui) {
+    this.call = call; this.x = call.audio; this.segs = call.segs; this.ui = ui;
+    this.si = 0; this.k = 0; this.entered = false;
+    this.hdlc = new HdlcRx(f => ui.frame(f, this.segs[this.si]));
+  }
+  run(pos) {
+    while (this.si < this.segs.length) {
+      const s = this.segs[this.si];
+      if (pos < s.start) return;
+      if (!this.entered) { this.entered = true; this.begin(s); }
+      if (!this.step(s, pos)) return;
+      this.finish(s); this.si++; this.k = 0; this.entered = false;
+    }
+  }
+  begin(s) {
+    this.ui.phase(s);
+    if (s.kind === 'fsk') this.hdlc.reset();
+    if (s.kind === 'v29') {
+      this.g = 1; this.agc = 0; this.agcN = 0; this.prev = 0; this.ds = 0; this.nb = 0; this.tcfErr = 0;
+      if (s.purpose === 'page') this.mh = new MHDecoder({
+        run: (c, n) => this.ui.run(c, n),
+        line: (row, ok) => this.ui.line(row, ok),
+        eol: n => this.ui.eol(n),
+        end: () => this.ui.rtc(),
+        error: () => this.ui.codeError(),
+      });
+    }
+  }
+  finish(s) {
+    if (s.kind === 'v29' && s.purpose === 'tcf') this.ui.tcf(s.payloadBits, this.tcfErr);
+    this.ui.phaseEnd(s);
+  }
+  step(s, pos) {
+    const x = this.x;
+    if (s.kind === 'silence') return pos >= s.end;
+    if (s.kind === 'tone') {
+      const B = 480, nb = Math.floor((s.end - s.start) / B);
+      while (this.k < nb && s.start + (this.k + 1) * B <= pos) {
+        const a = s.start + this.k * B;
+        this.ui.tone(s, goertzel(x, a, a + B, 1100), goertzel(x, a, a + B, 2100), this.k);
+        this.k++;
+      }
+      return this.k >= nb && pos >= s.end;
+    }
+    if (s.kind === 'fsk') {
+      while (this.k < s.nbits && s.start + (this.k + 1) * SPB <= pos) {
+        const a = s.start + this.k * SPB;
+        const e1 = corr(x, a, a + SPB, 1650), e0 = corr(x, a, a + SPB, 1850);
+        const b = e1 > e0 ? 1 : 0;
+        this.ui.fskBit(b, e1, e0);
+        this.hdlc.push(b);
+        this.k++;
+      }
+      return this.k >= s.nbits && pos >= s.end;
+    }
+    if (s.kind === 'v29') {
+      while (this.k < s.nsym && s.start + HALF + this.k * SPS + HALF <= pos) { this.symbol(s, this.k); this.k++; }
+      return this.k >= s.nsym && pos >= s.end;
+    }
+    return true;
+  }
+  symbol(s, k) {
+    const raw = v29Rx(this.x, s.start + HALF + k * SPS);
+    if (k < TRAIN.s1) return;
+    if (k < TRAIN.s2) {   // alternating A/B: known amplitudes give the gain
+      this.agc += Math.hypot(raw[0], raw[1]) / (k % 2 ? 3 * R2 : 3); this.agcN++;
+      if (k === TRAIN.s2 - 1) this.g = this.agcN / this.agc;
+      this.ui.sym([raw[0] * this.g, raw[1] * this.g], 'train', k);
+      return;
+    }
+    const z = [raw[0] * this.g, raw[1] * this.g];
+    const ph = ((Math.round(Math.atan2(z[1], z[0]) / (Math.PI / 4)) % 8) + 8) % 8;
+    if (k < TRAIN.s3) { this.ui.sym(z, 'train', k); this.prev = ph; return; }
+    this.ui.sym(z, 'data', k);
+    const a = Math.hypot(z[0], z[1]);
+    const q1 = ph % 2 === 0 ? (a > 4 ? 1 : 0) : (a > 2 * R2 ? 1 : 0);
+    const qq = Q_OF[(ph - this.prev + 8) & 7];
+    this.prev = ph;
+    for (const b of [q1, (qq >> 2) & 1, (qq >> 1) & 1, qq & 1]) {
+      const o = b ^ ((this.ds >> 17) & 1) ^ ((this.ds >> 22) & 1);
+      this.ds = ((this.ds << 1) | b) & 0x7FFFFF;
+      const p = this.nb++ - 192;
+      if (p < 0) continue;   // scrambled ones that end the training
+      if (s.purpose === 'tcf') { if (p < s.payloadBits) { if (o) this.tcfErr++; this.ui.dataBit(o); } }
+      else if (s.purpose === 'page' && p < s.payloadBits) { this.ui.dataBit(o); this.mh.push(o); }
+    }
+  }
+}
+</script>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const PAGE_H = 1000, LINES = Math.floor(PAGE_H * 3.85 / 8);
+let call = null, mon = null, ctx = null, gainNode = null, src = null, audioBuf = null;
+let t0 = 0, state = 'idle', userImg = null, rows = null, inverted = false, camShot = false;
+
+// ---------- the sheet that gets faxed ----------
+function wrapText(g, text, maxW) {
+  const out = [];
+  for (const para of text.split('\n')) {
+    let line = '';
+    for (const word of para.split(/\s+/)) {
+      if (!word) continue;
+      const t = line ? line + ' ' + word : word;
+      if (g.measureText(t).width > maxW && line) { out.push(line); line = word; } else line = t;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function renderPage() {
+  const cv = document.createElement('canvas');
+  cv.width = WIDTH; cv.height = PAGE_H;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, WIDTH, PAGE_H);
+  g.fillStyle = '#000'; g.strokeStyle = '#000';
+  const mono = '"Courier Prime", "Courier New", monospace';
+  g.font = `700 30px ${mono}`;
+  g.fillText('27-10-1990 14:03   VAN: ' + TX_ID, 60, 46);
+  g.textAlign = 'right'; g.fillText('P.01/01', 1668, 46); g.textAlign = 'left';
+  g.fillRect(60, 62, 1608, 4);
+  let imgTop = PAGE_H;
+  if (userImg) {
+    imgTop = 84;
+    const h = PAGE_H - imgTop - 16, w = 1648;
+    const s = Math.min(w / userImg.width, h / userImg.height);
+    const dw = userImg.width * s, dh = userImg.height * s;
+    g.drawImage(userImg, 40 + (w - dw) / 2, imgTop + (h - dh) / 2, dw, dh);
+  } else {
+    g.font = `700 230px ${mono}`;
+    g.fillText('FAX', 52, 280);
+    g.font = `700 46px ${mono}`;
+    g.fillText('AAN:     de klas', 640, 150);
+    g.fillText('VAN:     de faxmachine', 640, 210);
+    g.fillText('BETREFT: zo klinkt een fax', 640, 270);
+    g.fillRect(60, 318, 1608, 3);
+    g.font = `400 44px ${mono}`;
+    wrapText(g, $('msg').value, 1000).slice(0, 8).forEach((l, i) => g.fillText(l, 60, 410 + i * 62));
+    // a cube in a CAD drawing style, with a dimension line
+    const cx = 1350, cy = 640, a = 170;
+    const P = (x, y, z) => [cx + (x - z) * a * 0.866, cy + (x + z) * a * 0.5 - y * a];
+    g.lineWidth = 7;
+    const V = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].map(v => v.map(c => c * 0.75));
+    for (const [i, j] of [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]]) {
+      g.beginPath(); g.moveTo(...P(...V[i])); g.lineTo(...P(...V[j])); g.stroke();
+    }
+    g.font = `700 34px ${mono}`;
+    g.fillText('40 mm', cx - 60, cy + 300);
+    g.lineWidth = 4;
+    g.beginPath(); g.moveTo(cx - 255, cy + 250); g.lineTo(cx + 255, cy + 250); g.stroke();
+    g.font = `400 44px ${mono}`;
+    g.fillText('Groeten,', 60, 920);
+    g.lineWidth = 5; g.beginPath(); g.moveTo(300, 940);
+    g.bezierCurveTo(340, 860, 380, 980, 420, 910); g.bezierCurveTo(450, 870, 470, 950, 520, 920); g.bezierCurveTo(560, 900, 600, 930, 660, 915); g.stroke();
+  }
+  // sample to fax standard resolution: 8 dots/mm across, 3.85 lines/mm down
+  const data = g.getImageData(0, 0, WIDTH, PAGE_H).data;
+  const lum = new Float32Array(WIDTH * LINES);
+  const rowY = r => Math.min(PAGE_H - 1, Math.round(r * 8 / 3.85));
+  let sum = 0, cnt = 0;
+  for (let r = 0; r < LINES; r++) {
+    const y = rowY(r);
+    for (let x = 0; x < WIDTH; x++) {
+      const i = (y * WIDTH + x) * 4, v = (data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11) / 255;
+      lum[r * WIDTH + x] = v;
+      if (y >= imgTop) { sum += v; cnt++; }
+    }
+  }
+  const mean = cnt ? sum / cnt : 1;
+  // a camera photo: stretch the contrast around its mean, or a face becomes one dark blot
+  // a dark screenshot (dark mode) would print as a black sheet: flip it
+  inverted = !camShot && cnt > 0 && mean < 0.45;
+  if (camShot || inverted)
+    for (let r = 0; r < LINES; r++) if (rowY(r) >= imgTop) for (let x = 0; x < WIDTH; x++) {
+      const i = r * WIDTH + x;
+      lum[i] = camShot ? Math.max(0, Math.min(1, (lum[i] - mean) * 1.6 + 0.5)) : 1 - lum[i];
+    }
+  const out = [];
+  const dith = userImg && $('dither').checked;
+  for (let r = 0; r < LINES; r++) {
+    const row = new Uint8Array(WIDTH);
+    for (let x = 0; x < WIDTH; x++) {
+      const i = r * WIDTH + x, v = lum[i], b = v < 0.5 ? 1 : 0;
+      row[x] = b;
+      if (dith) {
+        const e = v - (b ? 0 : 1);
+        if (x + 1 < WIDTH) lum[i + 1] += e * 7 / 16;
+        if (r + 1 < LINES) { if (x > 0) lum[i + WIDTH - 1] += e * 3 / 16; lum[i + WIDTH] += e * 5 / 16; if (x + 1 < WIDTH) lum[i + WIDTH + 1] += e / 16; }
+      }
+    }
+    out.push(row);
+  }
+  return out;
+}
+const INK = [29, 30, 43], PAPER = [243, 241, 232];
+function putRows(cv, rs, y0, ink, paper) {
+  const g = cv.getContext('2d'), img = g.createImageData(WIDTH, rs.length);
+  rs.forEach((row, r) => {
+    for (let x = 0; x < WIDTH; x++) {
+      const i = (r * WIDTH + x) * 4, c = row[x] ? ink : paper;
+      img.data[i] = c[0]; img.data[i + 1] = c[1]; img.data[i + 2] = c[2]; img.data[i + 3] = 255;
+    }
+  });
+  g.putImageData(img, 0, y0);
+}
+
+// ---------- the story ----------
+const STEPS = {
+  0: ['Klaar om te bellen', 'Kies wat je wilt versturen en druk op Bel en verstuur. Zet je geluid aan.'],
+  1: ['Bellen', 'Jouw fax piept op 1100 Hz: “Ik ben een fax!” De andere fax neemt op met een hoge toon van 2100 Hz.'],
+  2: ['Afspreken', 'De faxen vertellen wie ze zijn en spreken af hoe snel ze gaan praten. Dat gekwetter is trage data: 300 bits per seconde.'],
+  3: ['Testen', 'Jouw fax stuurt anderhalve seconde alleen nullen, op topsnelheid. Komen ze allemaal goed aan, dan is de lijn goed genoeg.'],
+  4: ['Beeld versturen', 'Nu gaat het snel: 9600 bits per seconde. Zoveel informatie in geluid klinkt als ruis. Kijk hoe het blad regel per regel uit de fax komt.'],
+  5: ['Ophangen', '“Dat was de laatste pagina.” “Alles goed ontvangen.” Daag!'],
+  6: ['Klaar', 'De pagina is verzonden. Vergelijk het origineel met wat eruit kwam: de letters zijn wat platter, want een fax heeft minder regels dan puntjes per regel.'],
+};
+const stepOf = label => ({ CNG: 1, CED: 1, 'CSI·DIS': 2, 'TSI·DCS': 2, TCF: 3, CFR: 3, EOP: 5, MCF: 5, DCN: 5 })[label] || (label && label.startsWith('BEELD') ? 4 : 0);
+const num = f => String.fromCharCode(...f.fif).split('').reverse().join('').trim();
+const SAY = {
+  CSI: f => `Mijn nummer is ${num(f)}.`,
+  DIS: () => 'Ik kan tot 9600 bits per seconde ontvangen.',
+  TSI: f => `Hallo, ik ben ${num(f)}.`,
+  DCS: () => 'Goed, dan sturen we met 9600 bits per seconde.',
+  CFR: () => 'Test gelukt, stuur maar!',
+  EOP: () => 'Dat was de laatste pagina.',
+  MCF: () => 'Alles goed ontvangen, bedankt.',
+  DCN: () => 'Daag! (de fax hangt op)',
+};
+const SOUND_CAP = {
+  tone: 'Eén zuivere toon. Hoe dichter de golfjes, hoe hoger de toon.',
+  fsk: 'Twee tonen wisselen af: de lagere (1650 Hz) is een <b>1</b>, de hogere (1850 Hz) een <b>0</b>. 300 keer per seconde.',
+  train: 'Eerst een vast leerpatroon, zodat de ontvanger het signaal leert kennen.',
+  v29: 'Elk stukje geluid van 1/2400 seconde heeft een eigen toonhoogte-stand en sterkte en draagt zo <b>4 bits</b>. 2400 × 4 = 9600 bits per seconde.',
+};
+
+const view = { mode: 'idle', bits: '', says: [], lastRuns: [], curRuns: [], lines: 0, err: 0, consts: [], fsk: [0, 0], toneSeen: {}, step: 0, who: null,
+  tcfBits: 0, tcfErr: 0, bitsSinceLine: 0, lastLineBits: 0 };
+const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const hex = a => a.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+function logLine(who, html) {
+  const li = document.createElement('li');
+  const whoTxt = who === 'tx' ? 'verzender' : who === 'rx' ? 'ontvanger' : 'lijn';
+  li.innerHTML = `<span class="t">${(curPos() / SR).toFixed(2)}s</span><span class="who ${who || 'mon'}">${whoTxt}</span><span class="m">${html}</span>`;
+  const log = $('log');
+  log.appendChild(li); log.scrollTop = log.scrollHeight;
+}
+function say(who, text, pk) {
+  view.says.push({ who, text, pk });
+  if (view.says.length > 3) view.says.shift();
+}
+function setStep(n, who) {
+  view.step = n; view.who = who;
+  const [t, p] = STEPS[n];
+  $('stepNum').textContent = n >= 1 && n <= 5 ? n : n === 6 ? '✓' : '▸';
+  $('stepTitle').textContent = t; $('stepText').textContent = p;
+  document.querySelectorAll('#steps li').forEach(li => {
+    const s = +li.dataset.s;
+    li.className = (s === n ? 'on ' + (who || '') : '') + (s < n ? ' done' : '');
+  });
+}
+
+const ui = {
+  phase(s) {
+    if (s.kind === 'silence') return;
+    setStep(stepOf(s.label), s.who);
+    document.querySelectorAll('#timeline .s').forEach(e => e.classList.toggle('on', +e.dataset.i === call.segs.indexOf(s)));
+    view.bits = '';
+    if (s.kind === 'tone') view.mode = 'tone';
+    if (s.kind === 'fsk') view.mode = 'fsk';
+    if (s.kind === 'v29') {
+      view.mode = 'train'; view.consts = []; view.purpose = s.purpose;
+      if (s.purpose === 'tcf') { view.tcfBits = 0; view.tcfErr = 0; }
+      if (s.purpose === 'page') { $('wait').hidden = true; $('head').style.opacity = 1; view.says = []; }
+    }
+  },
+  phaseEnd(s) {
+    if (s.kind === 'v29' && s.purpose === 'page') $('head').style.opacity = 0;
+  },
+  tone(s, e1100, e2100) {
+    const f = e1100 > e2100 ? 1100 : 2100;
+    if (Math.max(e1100, e2100) > 0.01 && !view.toneSeen[s.start]) {
+      view.toneSeen[s.start] = true;
+      if (f === 1100) { say('tx', 'Piiep… (1100 Hz)', 'betekent: ik ben een fax'); logLine('tx', '<b>CNG</b> 1100 Hz <span class="d">· calling tone</span>'); }
+      else { say('rx', 'Piiiiiiiep! (2100 Hz)', 'betekent: ik heb opgenomen'); logLine('rx', '<b>CED</b> 2100 Hz <span class="d">· called station identification</span>'); }
+    }
+  },
+  fskBit(b, e1, e0) { view.bits = (view.bits + b).slice(-96); view.fsk = [e1, e0]; },
+  frame(f, s) {
+    const [name, what] = FCF[f.fcf] || ['?', 'onbekend frame'];
+    if (SAY[name]) say(s.who, SAY[name](f), `pakketje “${name}” · controlegetal ${f.ok ? 'klopt' : 'klopt niet'}`);
+    let extra = '';
+    if (name === 'CSI' || name === 'TSI') extra = ` <span class="d">·</span> ${esc(num(f))}`;
+    else if (FIF_TXT[name]) extra = ` <span class="d">· FIF ${hex(f.fif)} · ${FIF_TXT[name]}</span>`;
+    logLine(s.who, `<b>${name}</b> ${what}${extra} <span class="${f.ok ? 'ok' : 'bad'}">${f.ok ? 'CRC ok' : 'CRC fout'}</span>`);
+  },
+  sym(z, stage) {
+    view.consts.push([z[0], z[1], stage]);
+    if (view.consts.length > 260) view.consts.splice(0, view.consts.length - 260);
+  },
+  dataBit(b) {
+    view.mode = 'v29';
+    view.bits = (view.bits + b).slice(-96);
+    if (view.purpose === 'tcf') { view.tcfBits++; if (b) view.tcfErr++; }
+    else view.bitsSinceLine++;
+  },
+  tcf(n, err) {
+    say('rx', err ? `${err} fouten in de test.` : `${n.toLocaleString('nl-BE')} nullen ontvangen, geen enkele fout.`, 'de ontvanger telt na');
+    logLine('rx', `<b>TCF</b> ${n} bits gecontroleerd, <span class="${err ? 'bad' : 'ok'}">${err} fouten</span>`);
+  },
+  run(c, n) { view.curRuns.push([c, n]); },
+  line(row, ok) {
+    const r = view.lines++;
+    if (r < LINES) putRows($('paper'), [row], r, INK, PAPER);
+    putRows($('linec'), [row], 0, INK, PAPER);
+    view.lastRuns = view.curRuns; view.curRuns = [];
+    view.lastLineBits = view.bitsSinceLine; view.bitsSinceLine = 0;
+    if (!ok) view.err++;
+  },
+  eol(n) { if (n === 1 && view.lines === 0) logLine('mon', '<b>EOL</b> 000000000001 <span class="d">· eerste beeldregel</span>'); },
+  rtc() { logLine('mon', `<b>RTC</b> 6 × EOL <span class="d">· pagina compleet, ${view.lines} regels</span>`); },
+};
+
+// ---------- the four boxes ----------
+function renderChain(pos) {
+  const m = view.mode;
+  $('capSound').innerHTML = m === 'idle' ? 'De lijn is stil.' : (SOUND_CAP[m] || '');
+  $('bits').textContent = view.bits;
+  $('capBits').innerHTML =
+    m === 'fsk' ? 'De bits vormen kleine <b>pakketjes</b>, met een controlegetal om fouten te vinden.' :
+    m === 'v29' && view.purpose === 'tcf' ? 'Allemaal nullen: dit is de test.' :
+    m === 'v29' ? 'Deze bits zijn de <b>samengevatte</b> puntjes van het blad.' :
+    m === 'train' ? 'Tijdens het leerpatroon komen er nog geen bits uit.' :
+    m === 'tone' ? 'Een toon is geen data, alleen een signaal: “hier ben ik”.' : 'Nog geen bits.';
+  const meaning = $('meaning');
+  if (m === 'v29' && view.purpose === 'page') {
+    $('box3').textContent = 'Uitpakken'; $('box3s').textContent = 'de samenvatting van één regel';
+    const rs = view.lastRuns, shown = rs.slice(0, 18);
+    meaning.innerHTML = `<div class="runs">${shown.map(([c, n]) => `<span class="${c ? 'b' : 'w'}">${c ? 'zwart' : 'wit'} ${n}</span>`).join('')}${rs.length > shown.length ? `<span class="more">+${rs.length - shown.length} meer</span>` : ''}</div>`;
+    $('capMeaning').innerHTML = '<b>wit 312</b> betekent: 312 witte puntjes na elkaar. Dan komt zwart, dan weer wit, tot de 1728 puntjes van de regel vol zijn.';
+  } else if (m === 'v29' && view.purpose === 'tcf') {
+    $('box3').textContent = 'Nakijken'; $('box3s').textContent = 'komen de nullen goed aan?';
+    meaning.innerHTML = `<div class="say rx"><span class="w">ontvanger</span>${view.tcfBits.toLocaleString('nl-BE')} nullen geteld, <span class="${view.tcfErr ? 'bad' : 'ok'}">${view.tcfErr} fouten</span></div>`;
+    $('capMeaning').textContent = 'Te veel fouten? Dan zouden ze trager afspreken, bijvoorbeeld 4800 bits per seconde.';
+  } else {
+    $('box3').textContent = 'Betekenis'; $('box3s').textContent = 'wat de faxen tegen elkaar zeggen';
+    meaning.innerHTML = view.says.map(s => `<div class="say ${s.who}"><span class="w">${s.who === 'tx' ? 'jouw fax' : 'andere fax'}</span>${esc(s.text)}${s.pk ? ` <span class="pk">· ${esc(s.pk)}</span>` : ''}</div>`).join('');
+    $('capMeaning').textContent = view.says.length ? 'Zo lezen de faxen de pakketjes. Jij hoort alleen gekwetter.' : '';
+  }
+  $('capLine').innerHTML = view.lines
+    ? `Regel <b>${Math.min(view.lines, LINES)}</b> van ${LINES}: ${view.lastRuns.length} stukjes, <b>${view.lastLineBits}</b> bits verstuurd in plaats van 1728.`
+    : 'Nog geen beeldregel.';
+}
+
+// ---------- drawing ----------
+const scope = $('scope'), sg = scope.getContext('2d');
+const spec = $('spec'), spg = spec.getContext('2d');
+const con = $('const'), cg = con.getContext('2d');
+const fskc = $('fsk'), fg = fskc.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function drawScope(pos) {
+  const W = scope.width, H = scope.height, N = 720;
+  sg.fillStyle = css('--well'); sg.fillRect(0, 0, W, H);
+  sg.strokeStyle = '#1e252c'; sg.lineWidth = 1;
+  sg.beginPath(); sg.moveTo(0, H / 2); sg.lineTo(W, H / 2); sg.stroke();
+  if (!call) return;
+  const s = call.segs.find(s => pos >= s.start && pos < s.end);
+  sg.strokeStyle = s && s.who === 'rx' ? css('--rx') : css('--tx'); sg.lineWidth = 2;
+  sg.beginPath();
+  for (let i = 0; i < N; i++) { const v = call.audio[pos - N + i] || 0; const x = i / (N - 1) * W, y = H / 2 - v * H * 0.85; i ? sg.lineTo(x, y) : sg.moveTo(x, y); }
+  sg.stroke();
+}
+
+const FFTN = 512, HANN = Float32Array.from({ length: FFTN }, (_, i) => 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (FFTN - 1)));
+const BINS = Math.floor(4000 / (SR / FFTN));
+function fftMag(x, start) {
+  const re = new Float32Array(FFTN), im = new Float32Array(FFTN);
+  for (let i = 0; i < FFTN; i++) re[i] = (x[start + i] || 0) * HANN[i];
+  for (let i = 1, j = 0; i < FFTN; i++) { let bit = FFTN >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= FFTN; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < FFTN; i += len) {
+      let cr = 1, ci = 0;
+      for (let j = 0; j < len / 2; j++) {
+        const a = i + j, b = a + len / 2, tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+  const out = new Float32Array(BINS);
+  for (let k = 0; k < BINS; k++) out[k] = 20 * Math.log10(Math.hypot(re[k], im[k]) / (FFTN / 4) + 1e-9);
+  return out;
+}
+const RAMP = (() => {
+  const stops = [[0, [11, 14, 17]], [0.35, [40, 30, 70]], [0.6, [200, 80, 40]], [0.85, [255, 181, 71]], [1, [255, 245, 220]]];
+  return Array.from({ length: 256 }, (_, i) => {
+    const t = i / 255; let k = 0; while (k < stops.length - 2 && t > stops[k + 1][0]) k++;
+    const [ta, c0] = stops[k], [tb, c1] = stops[k + 1], u = (t - ta) / (tb - ta);
+    return `rgb(${c0.map((c, j) => Math.round(c + (c1[j] - c) * u)).join(',')})`;
+  });
+})();
+let lastCol = -1;
+const COL = 240;
+function clearSpec() { spg.fillStyle = css('--well'); spg.fillRect(0, 0, spec.width, spec.height); lastCol = -1; }
+function drawSpec(pos) {
+  const target = Math.floor(pos / COL);
+  if (target <= lastCol) return;
+  const n = Math.min(target - lastCol, spec.width);
+  spg.drawImage(spec, -n, 0);
+  const bh = spec.height / BINS;
+  for (let c = 0; c < n; c++) {
+    const m = fftMag(call.audio, (target - n + 1 + c) * COL - FFTN), x = spec.width - n + c;
+    for (let k = 0; k < BINS; k++) {
+      const t = Math.max(0, Math.min(1, (m[k] + 85) / 75));
+      spg.fillStyle = RAMP[Math.round(t * 255)];
+      spg.fillRect(x, spec.height - (k + 1) * bh, 1, Math.ceil(bh));
+    }
+  }
+  lastCol = target;
+}
+function drawConst() {
+  const W = con.width, H = con.height, s = W / 13;
+  cg.fillStyle = css('--well'); cg.fillRect(0, 0, W, H);
+  cg.strokeStyle = '#1e252c'; cg.lineWidth = 1;
+  cg.beginPath(); cg.moveTo(W / 2, 0); cg.lineTo(W / 2, H); cg.moveTo(0, H / 2); cg.lineTo(W, H / 2); cg.stroke();
+  cg.strokeStyle = '#3a4550';
+  for (let p = 0; p < 8; p++) for (const q of [0, 1]) { const [a, b] = v29Point(p, q); cg.beginPath(); cg.arc(W / 2 + a * s, H / 2 - b * s, 5, 0, 7); cg.stroke(); }
+  const n = view.consts.length, tx = css('--tx'), rx = css('--rx');
+  view.consts.forEach(([a, b, st], i) => {
+    cg.globalAlpha = 0.15 + 0.85 * (i / n);
+    cg.fillStyle = st === 'train' ? rx : tx;
+    cg.fillRect(W / 2 + a * s - 2, H / 2 - b * s - 2, 4, 4);
+  });
+  cg.globalAlpha = 1;
+  cg.fillStyle = css('--muted'); cg.font = '11px "IBM Plex Mono", monospace';
+  cg.fillText('16 punten · 4 bits', 6, 14);
+}
+function drawFsk() {
+  const W = fskc.width;
+  fg.fillStyle = css('--well'); fg.fillRect(0, 0, W, fskc.height);
+  const [e1, e0] = view.fsk, m = Math.max(e1, e0, 1e-9);
+  fg.font = '11px "IBM Plex Mono", monospace';
+  [[e1, '1650 Hz = 1', 10], [e0, '1850 Hz = 0', 38]].forEach(([e, l, y]) => {
+    fg.fillStyle = '#1e252c'; fg.fillRect(92, y, W - 100, 16);
+    fg.fillStyle = e === m && e > 0 ? css('--rx') : '#3a4550'; fg.fillRect(92, y, (W - 100) * e / m, 16);
+    fg.fillStyle = css('--muted'); fg.fillText(l, 6, y + 12);
+  });
+}
+
+// ---------- timeline ----------
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function buildTimeline() {
+  const tl = $('timeline'), cur = $('cur');
+  tl.innerHTML = ''; tl.appendChild(cur);
+  const total = call.audio.length;
+  call.segs.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 's' + (s.who ? ' ' + s.who : '');
+    d.dataset.i = i;
+    d.style.width = ((s.end - s.start) / total * 100) + '%';
+    if (s.label) { d.title = s.label; if ((s.end - s.start) / total > 0.06) d.textContent = s.label.startsWith('BEELD') ? 'BEELD' : s.label; }
+    tl.appendChild(d);
+  });
+}
+
+// ---------- audio and the loop ----------
+function curPos() {
+  if (!ctx || !call || state === 'idle') return 0;
+  return Math.max(0, Math.min(call.audio.length, Math.floor((ctx.currentTime - t0) * SR)));
+}
+function stopSrc() { if (src) { try { src.onended = null; src.stop(); } catch (e) { /* already stopped */ } src.disconnect(); src = null; } }
+async function play(fromSec) {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    gainNode = ctx.createGain(); gainNode.gain.value = +$('vol').value; gainNode.connect(ctx.destination);
+  }
+  if (ctx.state === 'suspended') await ctx.resume();
+  if (!audioBuf) { audioBuf = ctx.createBuffer(1, call.audio.length, SR); audioBuf.copyToChannel(call.audio, 0); }
+  stopSrc();
+  src = ctx.createBufferSource(); src.buffer = audioBuf; src.connect(gainNode);
+  const when = ctx.currentTime + 0.05;
+  src.start(when, fromSec);
+  t0 = when - fromSec;
+  src.onended = () => { if (state === 'playing') { state = 'done'; syncButtons(); } };
+  state = 'playing'; syncButtons();
+  requestAnimationFrame(tick);
+}
+function tick() {
+  if (state === 'idle') return;
+  const pos = curPos();
+  mon.run(pos);
+  drawScope(pos); drawSpec(pos); drawConst(); drawFsk();
+  renderChain(pos);
+  $('sLines').textContent = Math.min(view.lines, LINES); $('sErr').textContent = view.err;
+  const frac = Math.min(view.lines, LINES) / LINES * 100;
+  $('head').style.top = frac + '%';
+  $('paper').style.clipPath = `inset(0 0 ${100 - frac}% 0)`;
+  $('cur').style.left = (pos / call.audio.length * 100) + '%';
+  $('timer').textContent = `${fmt(pos / SR)} / ${fmt(call.audio.length / SR)}`;
+  if (state === 'done' && pos >= call.audio.length) { setStep(6, null); view.mode = 'idle'; renderChain(pos); return; }
+  requestAnimationFrame(tick);
+}
+function syncButtons() {
+  $('play').textContent = state === 'paused' ? 'Verder' : 'Bel en verstuur';
+  $('play').disabled = state === 'playing';
+  $('pause').disabled = state !== 'playing';
+  $('msg').disabled = !!userImg;
+}
+function resetRun() {
+  stopSrc();
+  state = 'idle';
+  Object.assign(view, { mode: 'idle', bits: '', says: [], lastRuns: [], curRuns: [], lines: 0, err: 0, consts: [], fsk: [0, 0], toneSeen: {},
+    tcfBits: 0, tcfErr: 0, bitsSinceLine: 0, lastLineBits: 0 });
+  mon = call ? new Monitor(call, ui) : null;
+  $('log').innerHTML = '';
+  const pg = $('paper').getContext('2d'); pg.fillStyle = `rgb(${PAPER})`; pg.fillRect(0, 0, WIDTH, LINES);
+  const lg = $('linec').getContext('2d'); lg.fillStyle = `rgb(${PAPER})`; lg.fillRect(0, 0, WIDTH, 1);
+  $('paper').style.clipPath = 'inset(0 0 100% 0)';
+  $('head').style.opacity = 0; $('wait').hidden = false;
+  $('cur').style.left = '0%';
+  document.querySelectorAll('#timeline .s').forEach(e => e.classList.remove('on'));
+  setStep(0, null);
+  clearSpec(); drawScope(0); drawConst(); drawFsk(); renderChain(0);
+  $('sLines').textContent = 0; $('sErr').textContent = 0;
+  if (call) $('timer').textContent = `0:00 / ${fmt(call.audio.length / SR)}`;
+  syncButtons();
+}
+function prepare() {
+  rows = renderPage();
+  call = buildCall(rows);
+  audioBuf = null;
+  putRows($('orig'), rows, 0, [0, 0, 0], [255, 255, 255]);
+  buildTimeline();
+  const total = call.audio.length / SR, img = (call.pageSeg.end - call.pageSeg.start) / SR;
+  $('sLinesT').textContent = rows.length;
+  $('sBits').textContent = call.imageBits.toLocaleString('nl-BE');
+  $('sRaw').textContent = (WIDTH * rows.length).toLocaleString('nl-BE');
+  $('sendinfo').innerHTML = `Verzendtijd <b>${fmt(total)}</b>, waarvan <b>${img.toFixed(1)} s</b> beeld. Samengevat is het blad <b>${(WIDTH * rows.length / call.imageBits).toFixed(1)} keer kleiner</b>.` +
+    (inverted ? ' De afbeelding was donker, dus wit en zwart zijn omgedraaid.' : '');
+  $('sample').hidden = !userImg;
+  resetRun();
+}
+
+// ---------- input ----------
+$('play').onclick = async () => {
+  if (state === 'paused') { await ctx.resume(); state = 'playing'; syncButtons(); requestAnimationFrame(tick); return; }
+  if (state === 'done') resetRun();
+  play(0);
+};
+$('pause').onclick = async () => { if (state !== 'playing') return; await ctx.suspend(); state = 'paused'; syncButtons(); };
+$('reset').onclick = () => resetRun();
+$('skip').onclick = async () => {
+  if (!call) return;
+  const target = Math.max(0, call.pageSeg.start / SR - 0.3);
+  if (state === 'done') resetRun();
+  if (state === 'paused') await ctx.resume();
+  if (state !== 'idle' && curPos() / SR > target) return;
+  play(target);
+};
+$('vol').oninput = () => { if (gainNode) gainNode.gain.value = +$('vol').value; };
+let msgTimer = 0;
+$('msg').oninput = () => { clearTimeout(msgTimer); msgTimer = setTimeout(prepare, 400); };
+$('dither').onchange = () => { if (userImg) prepare(); };
+$('sample').onclick = () => { userImg = null; camShot = false; $('img').value = ''; prepare(); };
+
+// ---------- webcam ----------
+// Inside the claude.ai frame the camera is refused; then the browser's own camera input
+// is used (a phone or tablet opens its camera, a laptop shows a file picker).
+let camStream = null;
+$('camBtn').onclick = async () => {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no camera API');
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    $('camv').srcObject = camStream;
+    $('cam').showModal();
+  } catch (e) {
+    $('sendinfo').textContent = 'De webcam mag op deze plek niet gebruikt worden. Op een gsm of tablet opent nu de camera, anders kies je een foto. Open de pagina als los bestand in de browser om de webcam te gebruiken.';
+    $('camIn').click();
+  }
+};
+$('camIn').onchange = e => loadImageFile(e.target.files && e.target.files[0], true);
+$('snap').onclick = () => {
+  const v = $('camv');
+  if (!v.videoWidth) return;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  userImg = c; camShot = true;
+  $('cam').close();
+  prepare();
+};
+$('cam').addEventListener('close', () => { if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; } });
+
+// ---------- dialogs and tooltips ----------
+$('openHelp').onclick = () => $('help').showModal();
+$('openTech').onclick = () => $('tech').showModal();
+document.querySelectorAll('dialog').forEach(d => {
+  d.addEventListener('click', e => { if (e.target === d || e.target.closest('[data-close]')) d.close(); });
+});
+const tip = $('tip');
+let tipFor = null;
+function showTip(el) {
+  tip.innerHTML = el.dataset.tip;
+  tip.classList.add('show');
+  const r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+  const x = Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2));
+  let y = r.bottom + 8;
+  if (y + th > innerHeight - 8) y = r.top - th - 8;
+  tip.style.left = x + 'px'; tip.style.top = Math.max(8, y) + 'px';
+  tipFor = el;
+}
+function hideTip() { tip.classList.remove('show'); tipFor = null; }
+document.addEventListener('pointerover', e => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('[data-tip]');
+  if (el) { if (el !== tipFor) showTip(el); } else if (tipFor) hideTip();
+});
+document.addEventListener('focusin', e => { const el = e.target.closest('[data-tip]'); if (el) showTip(el); else hideTip(); });
+document.addEventListener('click', e => {
+  const el = e.target.closest('.q');
+  if (el) { tipFor === el && e.pointerType !== 'mouse' ? hideTip() : showTip(el); return; }
+  if (tipFor && !e.target.closest('[data-tip]')) hideTip();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+window.addEventListener('scroll', hideTip, true);
+
+function loadImageFile(f, photo = false) {
+  if (!f || !f.type.startsWith('image/')) { $('sendinfo').textContent = 'Dat is geen afbeelding. Kies een PNG, JPG, GIF of WebP.'; return; }
+  const url = URL.createObjectURL(f), im = new Image();
+  im.onload = () => { userImg = im; camShot = photo; prepare(); URL.revokeObjectURL(url); };
+  im.onerror = () => { $('sendinfo').textContent = 'Deze afbeelding kon niet gelezen worden. Probeer een PNG of JPG.'; URL.revokeObjectURL(url); };
+  im.src = url;
+}
+const drop = $('drop');
+drop.onclick = () => $('img').click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('img').click(); } };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); loadImageFile(e.dataTransfer.files && e.dataTransfer.files[0]); };
+$('img').onchange = e => loadImageFile(e.target.files && e.target.files[0]);
+document.addEventListener('paste', e => {
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (const it of items) if (it.type && it.type.startsWith('image/')) { e.preventDefault(); loadImageFile(it.getAsFile()); return; }
+});
+
+(async () => {
+  try { await Promise.race([Promise.all([document.fonts.load('700 230px "Courier Prime"'), document.fonts.load('400 44px "Courier Prime"')]), new Promise(r => setTimeout(r, 2000))]); } catch (e) { /* fallback font */ }
+  prepare();
+})();
+</script>
